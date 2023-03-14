@@ -32,6 +32,7 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
     event Withdraw(address to, uint256 shares, uint256 amount);
     event RescuesTokenStuck(address token, uint256 amount);
 
+
     /**
      * @dev Sets the value of {token} to the token that the vault will
      * hold as underlying value. It initializes the vault's own 'moo' token.
@@ -47,6 +48,7 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
     function initParams(address _strategy) public onlyOwner {
         require(address(strategy) == address(0),"params initialized");
         strategy =  IStrategy(_strategy);
+        require(strategy.vault() == address(this),"wrong strategy");
         want = IERC20Upgradeable(strategy.want());
     }
     /**
@@ -112,6 +114,7 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
         } else {
             shares = (_amount*(totalSupply()))/(_pool);
         }
+
         _mint(user, shares);
         emit Deposit(msg.sender, shares, _amount);
     }

@@ -55,6 +55,8 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
     address public protocolReceiver;
 
     uint256 public totalHarvested;
+    uint256 public withdrawalFee;
+    uint256 public depositFee;
 
     address constant dexNative = 0xF4C8E32EaDEC4BFe97E0F595AdD0f4450a863a11; //THE
     address constant chainNative = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; //WBNB
@@ -95,7 +97,7 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
     }
 
     function initParams(address _mainToken, address _pairToken, bool _stable, address _gauge,
-        ISolidlyRouter.route[] memory _outputToLp0Route, ISolidlyRouter.route[] memory _outputToLp1Route) external onlyOwner {
+        ISolidlyRouter.route[] memory _outputToLp0Route, ISolidlyRouter.route[] memory _outputToLp1Route, address _vault) external onlyOwner {
 
         require(address(want) == address(0),"params initialized");
         address _want = ISolidlyRouter(uniRouter).pairFor(_mainToken, _pairToken, _stable);
@@ -135,6 +137,7 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
         _giveAllowances();
 
         startingDate = block.timestamp;
+        setVault(_vault);
         emit ParamsInitialized(address(want));
     }
 
@@ -149,6 +152,11 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
     // puts the funds to work
     function deposit() public whenNotPaused {
         uint256 wantBal = want.balanceOf(address(this));
+        if (depositFee>0) {
+            uint256 _fee = wantBal * depositFee / 10000;
+            want.safeTransfer(coFeeRecipient,_fee);
+            wantBal -= _fee;
+        }
 
         if (wantBal > 0) {
             gauge.deposit(wantBal);
@@ -167,6 +175,11 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
         }
         if (wantBal > _amount) {
             wantBal = _amount;
+        }
+        if (withdrawalFee>0) {
+            uint256 _fee = wantBal * withdrawalFee / 10000;
+            want.safeTransfer(coFeeRecipient,_fee);
+            wantBal -= _fee;
         }
         want.safeTransfer(_vault, wantBal);
         emit Withdraw(balanceOf());
@@ -443,6 +456,14 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
         emit SetFeeInDexNative(_feeInDexNative);
     }
 
+    function set_DepositWithdrawalFees(uint256 _withdrawalFee, uint256 _depositFee) external onlyManager {
+        require(_withdrawalFee <= 1000, "Withdrawal fee is too high");
+        require(_depositFee < 1000, "Deposit fee is too high");
+        withdrawalFee = _withdrawalFee;
+        depositFee = _depositFee;
+        emit SetDepositWithdrawalFees(_withdrawalFee, _depositFee);
+    }
+
     event Deposit(uint256 tvl);
     event Withdraw(uint256 tvl);
     event ChargedFees(uint256 callFees, uint256 coFees, uint256 strategistFees);
@@ -452,6 +473,7 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
     event SetFeeInDexNative(bool isEnabled);
     event RetireStrategy(address vault, uint256 amount);
     event SetProtocolFee(uint256 _protocolFee, address _protocolReceiver);
+    event SetDepositWithdrawalFees(uint256 _withdrawalFee,  uint256 _depositFee);
     event ParamsInitialized(address _want);
     event Panic(uint256 balance);
 

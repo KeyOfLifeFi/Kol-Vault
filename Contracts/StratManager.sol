@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 import "./AuthUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
@@ -78,7 +78,7 @@ contract StratManager is AuthUpgradeable, PausableUpgradeable {
      * @dev Updates parent vault.
      * @param _vault new vault address.
      */
-    function setVault(address _vault) external onlyOwner {
+    function setVault(address _vault) public onlyOwner {
         require(!hadVault, "StratManager: vault had been set up");
         vault = _vault;
         hadVault = true;
