@@ -66,7 +66,7 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
         __AuthUpgradeable_init();
 
         totalPerformanceFee = 500;          //  5.00%
-        callFee=100;                      //  1% of MAX_FEE
+        callFee=0;                      //  1% of MAX_FEE
         strategistFee=0;                //  0% of MAX_FEE
         coFee = MAX_FEE - (strategistFee + callFee);
 
@@ -274,21 +274,15 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
         if (stable) {
             uint256 out0 = lp0Amt;
             if (lpToken0 != output) {
-                out0 =
-                (router.getAmountsOut(lp0Amt, outputToLp0Route)[
-                outputToLp0Route.length
-                ] * 1e18) /
-                lp0Decimals;
+                out0 = router.getAmountsOut(lp0Amt, outputToLp0Route)[outputToLp0Route.length];
             }
+            out0 = out0 * 1e18 / lp0Decimals;
 
             uint256 out1 = lp1Amt;
             if (lpToken1 != output) {
-                out1 =
-                (router.getAmountsOut(lp1Amt, outputToLp1Route)[
-                outputToLp1Route.length
-                ] * 1e18) /
-                lp1Decimals;
+                out1 = router.getAmountsOut(lp1Amt, outputToLp1Route)[outputToLp1Route.length];
             }
+            out1 = out1 * 1e18 / lp1Decimals;
 
             (uint256 amountA, uint256 amountB, ) = router.quoteAddLiquidity(
                 lpToken0,
@@ -401,19 +395,19 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
 
     function _giveAllowances() internal {
         address _uniRouter = uniRouter;
-        want.approve(address(gauge), type(uint).max);
-        IERC20Upgradeable(output).approve(_uniRouter, type(uint).max);
-        IERC20Upgradeable(lpToken0).approve(_uniRouter, type(uint).max);
-        IERC20Upgradeable(lpToken1).approve(_uniRouter, type(uint).max);
+        want.safeApprove(address(gauge), type(uint).max);
+        IERC20Upgradeable(output).safeApprove(_uniRouter, type(uint).max);
+        IERC20Upgradeable(lpToken0).safeApprove(_uniRouter, type(uint).max);
+        IERC20Upgradeable(lpToken1).safeApprove(_uniRouter, type(uint).max);
         emit GiveAllowances();
     }
 
     function _removeAllowances() internal {
         address _uniRouter = uniRouter;
-        want.approve(address(gauge), 0);
-        IERC20Upgradeable(output).approve(_uniRouter, 0);
-        IERC20Upgradeable(lpToken0).approve(_uniRouter, 0);
-        IERC20Upgradeable(lpToken1).approve(_uniRouter, 0);
+        want.safeApprove(address(gauge), 0);
+        IERC20Upgradeable(output).safeApprove(_uniRouter, 0);
+        IERC20Upgradeable(lpToken0).safeApprove(_uniRouter, 0);
+        IERC20Upgradeable(lpToken1).safeApprove(_uniRouter, 0);
         emit RemoveAllowances();
     }
 
@@ -458,7 +452,7 @@ contract KolStrategyThena is Initializable, UUPSUpgradeable, FeeManager {
 
     function set_DepositWithdrawalFees(uint256 _withdrawalFee, uint256 _depositFee) external onlyManager {
         require(_withdrawalFee <= 1000, "Withdrawal fee is too high");
-        require(_depositFee < 1000, "Deposit fee is too high");
+        require(_depositFee <= 1000, "Deposit fee is too high");
         withdrawalFee = _withdrawalFee;
         depositFee = _depositFee;
         emit SetDepositWithdrawalFees(_withdrawalFee, _depositFee);

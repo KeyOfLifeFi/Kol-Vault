@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "./AuthUpgradeable.sol";
 import "./IStrategy.sol";
 
@@ -15,7 +15,7 @@ import "./IStrategy.sol";
  * This is the contract that receives funds and that users interface with.
  * The yield optimizing strategy itself is implemented in a separate 'Strategy.sol' contract.
  */
-contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, AuthUpgradeable, ReentrancyGuardUpgradeable {
+contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, AuthUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     function _authorizeUpgrade(address) internal override onlyOwner {}
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
@@ -42,7 +42,7 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
     function initialize() public initializer {
         __UUPSUpgradeable_init();
         __AuthUpgradeable_init();
-        __ERC20_init("KOL Automizer Receipt", "KOLAR");
+        __ERC20_init("KOL Automizer Receipt", "KOL-A-R");
     }
 
     function initParams(address _strategy) public onlyOwner {
@@ -94,12 +94,29 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
         depositFor(msg.sender, _amount);
     }
 
+    /* this code is to detect exploiter but is not needed anymore
+    event PauseForInvestigation(uint256 amount);
+
+    function checkShares(uint _amount) internal {
+        if (totalSupply() == 0) return;
+        uint256 _pool = balance();
+        uint256 shares = (_amount*(totalSupply()))/(_pool);
+        if (shares==0) {
+            _pause(); //stop deposit and withdraw for investigation
+            emit PauseForInvestigation(_amount);
+        }
+
+    }
+    */
+
     /**
      * @dev The entrypoint of funds into the system. People deposit with this function
      * into the vault. The vault is then in charge of sending funds into the strategy.
      */
-    function depositFor(address user, uint _amount) public nonReentrant {
-        //if (msg.sender == tx.origin)
+
+    function depositFor(address user, uint _amount) public nonReentrant whenNotPaused {
+        if (totalSupply()==0) require(isAuthorized(msg.sender),"first user must be authorized");
+
         strategy.beforeDeposit();
 
         uint256 _pool = balance();
@@ -114,8 +131,9 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
         } else {
             shares = (_amount*(totalSupply()))/(_pool);
         }
-
+        require(shares>0, "wrong shares");
         _mint(user, shares);
+
         emit Deposit(msg.sender, shares, _amount);
     }
     /**
@@ -162,7 +180,8 @@ contract KolAutomizerVault is Initializable, UUPSUpgradeable, ERC20Upgradeable, 
      * tokens are burned in the process.
      */
 
-    function withdraw(uint256 _shares) public {
+    function withdraw(uint256 _shares) public nonReentrant whenNotPaused{
+        strategy.beforeDeposit();
         uint256 r = (balance()*(_shares))/(totalSupply());
         _burn(msg.sender, _shares);
 
